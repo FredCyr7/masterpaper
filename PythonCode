@@ -1,0 +1,72 @@
+import pandas as pd
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+
+# Load the data from Excel
+excel_path = r'C:\Users\Frédérick\Desktop\MASTERPAPER.xlsx'  # Replace 'your_file_name' with the actual file name
+df = pd.read_excel(excel_path)
+df['date'] = pd.to_datetime(df['date'], format='%Y%m')  # Convert 'date' column to datetime format
+
+# Filter the DataFrame
+df_filtered = df[(df['date'] > '1998-12') & (df['date'] < '2019-01')]
+df_filtered = df_filtered[['stock_id', 'date', 'R1M_Usd', 'MKT_RF', 'SMB', 'HML', 'RF', 'Div_Yld']]
+df_filtered.iloc[:, 3:7] = df_filtered.iloc[:, 3:7] / 100  # Divide columns [3 to 6] by 100
+
+
+# Shift the returns by 1 period
+df_filtered['R1M_Usd'] = df_filtered.groupby('stock_id')['R1M_Usd'].shift(-1)
+
+# Plot the average return per factor over time
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12, 8))
+
+# Plotting the average return for all factors
+ax_all = axes[0, 0]
+df_filtered.groupby('date')[['MKT_RF', 'SMB', 'HML']].mean().plot(ax=ax_all)
+ax_all.set_xlabel('Date')
+ax_all.set_ylabel('Average Return')
+ax_all.legend(['MKT_RF', 'SMB', 'HML'])
+ax_all.set_title('Average Return for All Factors')
+
+# Plotting the average return for MKT_RF
+ax_mkt = axes[0, 1]
+df_filtered.groupby('date')['MKT_RF'].mean().plot(ax=ax_mkt)
+ax_mkt.set_xlabel('Date')
+ax_mkt.set_ylabel('Average Return')
+ax_mkt.set_title('Average Return for MKT_RF')
+
+# Plotting the average return for SMB
+ax_smb = axes[1, 0]
+df_filtered.groupby('date')['SMB'].mean().plot(ax=ax_smb)
+ax_smb.set_xlabel('Date')
+ax_smb.set_ylabel('Average Return')
+ax_smb.set_title('Average Return for SMB')
+
+# Plotting the average return for HML
+ax_hml = axes[1, 1]
+df_filtered.groupby('date')['HML'].mean().plot(ax=ax_hml)
+ax_hml.set_xlabel('Date')
+ax_hml.set_ylabel('Average Return')
+ax_hml.set_title('Average Return for HML')
+
+plt.tight_layout()
+plt.show()
+
+# Perform the regression for each stock
+factors = []
+for stock_id, data in df_filtered.groupby('stock_id'):
+    Y = data['R1M_Usd']
+    X = data[['MKT_RF', 'SMB', 'HML', 'Div_Yld']]
+    X_with_constant = sm.add_constant(X)
+    model = sm.OLS(Y, X_with_constant)
+    result = model.fit()
+
+    # Create a new row with factor values
+    new_row = {'stock_id': stock_id}
+    new_row.update(result.params)
+    factors.append(new_row)
+
+# Create DataFrame from factors list
+df_factors = pd.DataFrame(factors)
+
+# Print the factors
+print(df_factors)
